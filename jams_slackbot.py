@@ -8,16 +8,12 @@ slack_bot_key = ''
 bot_id = ''
 jams_user = ''
 jams_pass = ''
-uri_base = 'http://host_or_uri/JAMS'
+uri_base = 'http://URI_OF_REST_SERVER/JAMS'
 auth_uri = uri_base + '/api/authentication/login'
 jobs_uri = uri_base + '/api/entry'
 get_submit_uri = uri_base + '/api/submit?name='
 post_submit_uri = uri_base + '/api/submit'
-
-creds = {
-    'username': jams_user,
-    'password': jams_pass
-}
+creds = {'username': jams_user, 'password': jams_pass}
 
 # Slackbot variables
 at_bot = '<@' + bot_id + '>'
@@ -48,8 +44,8 @@ def run_jams_job(job_name, token):
         Job
     """
     # We need to pass our token to JAMS for authorization
-    job_info = requests.get(get_submit_uri + job_name, 
-                            headers={'Authorization': 'Bearer ' + token, 
+    job_info = requests.get(get_submit_uri + job_name,
+                            headers={'Authorization': 'Bearer ' + token,
                                      'content-type': 'application/json'})
     job_info = job_info.json()
     r = requests.post(post_submit_uri,
@@ -74,7 +70,6 @@ def get_failed_jobs(token):
     for i in range(len(jobs)):
         if jobs[i]['finalSeverity'] == 'Error':
             error_jobs.append(jobs[i]['jobName'])
-    
     return error_jobs
 
 
