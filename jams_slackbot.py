@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import time
 import requests
 import json
@@ -8,18 +9,23 @@ slack_bot_key = ''
 bot_id = ''
 jams_user = ''
 jams_pass = ''
-uri_base = 'http://URI_OF_REST_SERVER/JAMS'
+uri_base = 'http://localhost/JAMS'
 auth_uri = uri_base + '/api/authentication/login'
 jobs_uri = uri_base + '/api/entry'
 get_submit_uri = uri_base + '/api/submit?name='
+find_job_uri = uri_base + '/api/job/'
 post_submit_uri = uri_base + '/api/submit'
 creds = {'username': jams_user, 'password': jams_pass}
 
-# Slackbot variables
+# Slackbot commands/call
 at_bot = '<@' + bot_id + '>'
-do_command = 'run job'
+run_command = 'run job'
+find_command = 'find job'
 help_command = 'help'
 failed_command = 'get failed jobs'
+
+# Job blacklist - any jobs here cannot be run by the bot
+blacklist = ['SampleBlackListJob', 'AnotherBlacklistedJob']
 
 # Instatniate the Slack client
 slack_client = SlackClient(slack_bot_key)
@@ -38,23 +44,50 @@ def get_jams_token(jams_user, jams_pass):
     return resp['access_token']
 
 
+def find_jams_job(job_name, token):
+    """
+        Finds a JAMS Job and will return the parent folder. If there are
+        duplicate Jobs it will return all of them, storing in a list.
+    """
+    jobs = requests.get(find_job_uri,
+                        headers={'Authorization': 'Bearer ' + token,
+                                 'content-type': 'application/json'})
+    if jobs.response_code == 200:
+        jobs = jobs.json()
+        found_jobs = []
+        for i in range(len(jobs)):
+            if jobs[i]['jobName'].lower() == job_name:
+                found_jobs.append(jobs[i]['parentFolderName'])
+        return found_jobs
+    else:
+        return "*ERROR!* Status code {} was returned.".format(jobs.status_code)
+
+
 def run_jams_job(job_name, token):
     """
         Takes in the name of the job and a token to submit a specific JAMS
-        Job
+        Job that's not found in the Blacklist.
     """
-    # We need to pass our token to JAMS for authorization
-    job_info = requests.get(get_submit_uri + job_name,
-                            headers={'Authorization': 'Bearer ' + token,
-                                     'content-type': 'application/json'})
-    job_info = job_info.json()
-    r = requests.post(post_submit_uri,
-                      data=json.dumps(job_info),
-                      headers=headers)
-    if r.status_code == 200:
-        response = '{} was successfully Submitted to run!'.format(job_name)
+    # Is the job found in our blacklist?
+    if job_name not in [x.lower() for x in blacklist]:
+        # We need to pass our token to JAMS for authorization
+        job_info = requests.get(get_submit_uri + job_name,
+                                headers={'Authorization': 'Bearer ' + token,
+                                         'content-type': 'application/json'})
+        job_info = job_info.json()
+        r = requests.post(post_submit_uri,
+                          data=json.dumps(job_info),
+                          headers={'Authorization': 'Bearer ' + token,
+                                   'content-type': 'application/json'})
+        if r.status_code == 200:
+            response = '*{}* was successfully submitted to run!' \
+                        .format(job_name)
+        elif r.status_code == 422:
+            response = '*{}* was not found in JAMS. Typo?'.format(job_name)
+        else:
+            response = '*ERROR!* Response code was: {}'.format(r.status_code)
     else:
-        response = 'ERROR! Response code was: {}'.format(r.status_code)
+        response = '*ERROR!* {} is in the blacklist!'.format(job_name)
     return response
 
 
@@ -80,12 +113,28 @@ def handle_command(command, channel):
         it returns back what is needed for clarification.
     """
     response = 'Not sure what you mean. My available commands are: \
-    *{}* and *{}*'.format(do_command, help_command)
+                *{}*, *{}*, *{}*, and *{}*'.format(run_command,
+                                                   failed_command,
+                                                   find_command,
+                                                   help_command)
     if command.startswith(help_command):
         response = 'Available commands: \
                        \n\t - *help* \
                        \n\t - *run job* \
+                       \n\t - *find job* \
                        \n\t - *get failed jobs*'
+    if command.startswith(find_command):
+        job_name = command.split('find job ')[1]
+        token = get_jams_token(jams_user, jams_pass)
+        job_location = find_jams_job(job_name, token)
+        if len(job_location) == 1:
+            response = '*{}* found in {}'.format(job_name, job_location[0])
+        elif len(job_location) > 1:
+            response = '*' + job_name + \
+                       '* found in multiple locations: \n\t-' + \
+                       '\n\t-'.join(job_location)
+        else:
+            response = '*ERROR!* Job {} not found! Typo?'.format(job_name)
     if command.startswith(failed_command):
         token = get_jams_token(jams_user, jams_pass)
         failed_list = get_failed_jobs(token)
@@ -93,10 +142,10 @@ def handle_command(command, channel):
             response = 'Failed Jobs: \n\t-' + '\n\t-'.join(failed_list)
         else:
             response = 'No failed Jobs to report on!'
-    if command.startswith(do_command):
-        job_to_run = command.split('run job ')[1]
+    if command.startswith(run_command):
+        job_name = command.split('run job ')[1]
         token = get_jams_token(jams_user, jams_pass)
-        response = run_jams_job(job_to_run, token)
+        response = run_jams_job(job_name, token)
     slack_client.api_call('chat.postMessage', channel=channel,
                           text=response, as_user=True)
 
