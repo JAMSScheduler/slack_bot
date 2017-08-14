@@ -9,12 +9,14 @@ slack_bot_key = ''
 bot_id = ''
 jams_user = ''
 jams_pass = ''
-uri_base = 'http://localhost/JAMS'
+uri_base = 'http://JAMS_API_URI/JAMS'
 auth_uri = uri_base + '/api/authentication/login'
 jobs_uri = uri_base + '/api/entry'
 get_submit_uri = uri_base + '/api/submit?name='
 find_job_uri = uri_base + '/api/job/'
 post_submit_uri = uri_base + '/api/submit'
+get_vars_uri = uri_base + '/api/variable?name='
+put_vars_uri = uri_base + '/api/variable/'
 creds = {'username': jams_user, 'password': jams_pass}
 
 # Slackbot commands/call
@@ -22,12 +24,20 @@ at_bot = '<@' + bot_id + '>'
 run_command = 'run job'
 find_command = 'find job'
 help_command = 'help'
+test_cmd = 'test'
 failed_command = 'get failed jobs'
+update_var = 'update variable'
 
-# Job blacklist - any jobs here cannot be run by the bot
-blacklist = ['SampleBlackListJob', 'AnotherBlacklistedJob']
+# Job and variable blacklist -
+# any jobs here cannot be run by the bot
+# any variables cannot be updated by the bot
+job_blacklist = ['SampleBlackListJob', 'AnotherBlacklistedJob']
+var_blacklist = []
 
-# Instatniate the Slack client
+# User ACL/Whitelist - if this is empty everyone gets access
+user_acl = []
+
+# Instantiate the Slack client
 slack_client = SlackClient(slack_bot_key)
 
 
@@ -69,7 +79,7 @@ def run_jams_job(job_name, token):
         Job that's not found in the Blacklist.
     """
     # Is the job found in our blacklist?
-    if job_name not in [x.lower() for x in blacklist]:
+    if job_name not in [x.lower() for x in job_blacklist]:
         # We need to pass our token to JAMS for authorization
         job_info = requests.get(get_submit_uri + job_name,
                                 headers={'Authorization': 'Bearer ' + token,
@@ -88,6 +98,35 @@ def run_jams_job(job_name, token):
             response = '*ERROR!* Response code was: {}'.format(r.status_code)
     else:
         response = '*ERROR!* {} is in the blacklist!'.format(job_name)
+    return response
+
+
+def update_jams_var_value(var_name, new_value, token):
+    """
+        Takes in the name of a variable, an updated value, and a token to
+        update the value of a JAMS Variable var_blacklist.
+    """
+    # Is the job found in our blacklist?
+    if var_name not in [x.lower() for x in var_blacklist]:
+        # We need to pass our token to JAMS for authorization
+        var_info = requests.get(get_vars_uri + var_name,
+                                headers={'Authorization': 'Bearer ' + token,
+                                         'content-type': 'application/json'})
+        var_info = var_info.json()
+        var_info['value'] = new_value
+        r = requests.put(put_vars_uri,
+                         data=json.dumps(var_info),
+                         headers={'Authorization': 'Bearer ' + token,
+                                  'content-type': 'application/json'})
+        if r.status_code == 200:
+            response = '*{}* was successfully updated!' \
+                        .format(var_name)
+        elif r.status_code == 422:
+            response = '*{}* was not found in JAMS. Typo?'.format(var_name)
+        else:
+            response = '*ERROR!* Response code was: {}'.format(r.status_code)
+    else:
+        response = '*ERROR!* {} is in the blacklist!'.format(var_name)
     return response
 
 
@@ -112,11 +151,12 @@ def handle_command(command, channel):
         are valid commands. If so, then acts on the commands. If not,
         it returns back what is needed for clarification.
     """
-    response = 'Not sure what you mean. My available commands are: \
-                *{}*, *{}*, *{}*, and *{}*'.format(run_command,
-                                                   failed_command,
-                                                   find_command,
-                                                   help_command)
+    response = 'Not sure what you mean. My available commands are: \n \
+                *{}*, *{}*, *{}*, *{}*, and *{}*'.format(run_command,
+                                                         failed_command,
+                                                         find_command,
+                                                         help_command,
+                                                         update_var)
     if command.startswith(help_command):
         response = 'Available commands: \
                        \n\t - *help* \
@@ -135,6 +175,13 @@ def handle_command(command, channel):
                        '\n\t-'.join(job_location)
         else:
             response = '*ERROR!* Job {} not found! Typo?'.format(job_name)
+    if command.startswith(update_var):
+        split_values = command.split('update variable ')[1]
+        values = split_values.split(' value ')
+        var_name = values[0]
+        updated_var_value = values[1]
+        token = get_jams_token(jams_user, jams_pass)
+        response = update_jams_var_value(var_name, updated_var_value, token)
     if command.startswith(failed_command):
         token = get_jams_token(jams_user, jams_pass)
         failed_list = get_failed_jobs(token)
