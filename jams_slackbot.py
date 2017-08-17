@@ -60,7 +60,7 @@ def find_jams_job(job_name, token):
     jobs = requests.get(find_job_uri,
                         headers={'Authorization': 'Bearer ' + token,
                                  'content-type': 'application/json'})
-    if jobs.response_code == 200:
+    if jobs.status_code == 200:
         jobs = jobs.json()
         found_jobs = []
         for i in range(len(jobs)):
@@ -158,8 +158,9 @@ def handle_command(command, channel):
     if command.startswith(help_command):
         response = 'Available commands: \
                        \n\t - *help* \
-                       \n\t - *run job* \
-                       \n\t - *find job* \
+                       \n\t - *run job [job name]* \
+                       \n\t - *find job [job name]* \
+                       \n\t - *update variable [name] [value]* \
                        \n\t - *get failed jobs*'
     if command.startswith(find_command):
         job_name = command.split('find job ')[1]
