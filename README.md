@@ -1,7 +1,7 @@
 # slack_bot
 ## Dependencies:
 * Python (2/3)
-* request
+* requests
 * json
 * slackclient
 
@@ -16,4 +16,5 @@ nohup python jams_bot.py &
 * Run Job [Job Name] - Will Submit a Job within JAMS
 * Find Job [Job Name] - Will locate all instances of a Job within JAMS
 * Get Failed Jobs - List all Failed Jobs actively in the Monitor
+* Update Variable [Variable Name] Value [New Value] - Updates a JAMS Variable to have a new value 
 * Help - List help information
