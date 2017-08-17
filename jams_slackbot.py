@@ -24,7 +24,6 @@ at_bot = '<@' + bot_id + '>'
 run_command = 'run job'
 find_command = 'find job'
 help_command = 'help'
-test_cmd = 'test'
 failed_command = 'get failed jobs'
 update_var = 'update variable'
 
