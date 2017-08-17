@@ -34,8 +34,6 @@ update_var = 'update variable'
 job_blacklist = ['SampleBlackListJob', 'AnotherBlacklistedJob']
 var_blacklist = []
 
-# User ACL/Whitelist - if this is empty everyone gets access
-user_acl = []
 
 # Instantiate the Slack client
 slack_client = SlackClient(slack_bot_key)
