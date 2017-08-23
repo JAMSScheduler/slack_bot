@@ -24,6 +24,7 @@ at_bot = '<@' + bot_id + '>'
 run_command = 'run job'
 find_command = 'find job'
 help_command = 'help'
+test_cmd = 'test'
 failed_command = 'get failed jobs'
 update_var = 'update variable'
 
@@ -159,7 +160,7 @@ def handle_command(command, channel):
                        \n\t - *help* \
                        \n\t - *run job [job name]* \
                        \n\t - *find job [job name]* \
-                       \n\t - *update variable [name] [value]* \
+                       \n\t - *update variable [name] value [value]* \
                        \n\t - *get failed jobs*'
     if command.startswith(find_command):
         job_name = command.split('find job ')[1]
@@ -174,12 +175,15 @@ def handle_command(command, channel):
         else:
             response = '*ERROR!* Job {} not found! Typo?'.format(job_name)
     if command.startswith(update_var):
-        split_values = command.split('update variable ')[1]
-        values = split_values.split(' value ')
-        var_name = values[0]
-        updated_var_value = values[1]
-        token = get_jams_token(jams_user, jams_pass)
-        response = update_jams_var_value(var_name, updated_var_value, token)
+        try:
+            split_values = command.split('update variable ')[1]
+            values = split_values.split(' value ')
+            var_name = values[0]
+            updated_var_value = values[1]
+            token = get_jams_token(jams_user, jams_pass)
+            response = update_jams_var_value(var_name, updated_var_value, token)
+        except IndexError:
+            response = '*ERROR!* Please use the format: update variable [var name] value [value]'
     if command.startswith(failed_command):
         token = get_jams_token(jams_user, jams_pass)
         failed_list = get_failed_jobs(token)
